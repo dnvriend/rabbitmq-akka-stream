@@ -1,0 +1,118 @@
+<body>
+<div>
+    <h2>Overview</h2>
+    <p>
+        This project aims to show how reactive Akka Streams combined with Ractive Rabbit could provide an appealing way of working with RabbitMQ.
+    </p>
+    <p>
+        We are assuming some basic knowledge of RabbitMQ. Otherwise you wouldn't probably be here.
+        But if this is one of these rare cases then please look closer at this cool piece of technology here <a href="http://www.rabbitmq.com/">http://www.rabbitmq.com/</a> .
+    </p>
+    <p>
+        You should have a RabbitMQ server installed locally with a management plug-in.
+    </p>
+    <p>
+        This application simulates a simplified censorship (yes, censorship :)) procedure, that intercepts private messages, makes a content analysis, and qualifies the message as OK or NOT OK.
+        So the scenario is as follows:
+    </p>
+    <pre><code>Queue --> Akka Stream --> Exchange</code></pre>
+    <ol>
+        <li>Consume a message from a RabbitMQ queue
+        <li>Process it through Akka Stream
+        <li>Publish it back to a RabbitMQ exchange with one of the two routing keys (based on some simple decision making process).
+    </ol>
+</div>
+<div>
+    <h2>Explore</h2>
+    <p>
+        After starting the application you will see a short trial run that will result in five messages routed to <strong>censorship.ok.queue</strong>.
+    </p>
+    <p>
+        Then go to the RabbitMQ management console at <a href="http://boot2docker:8080/">http://localhost:15672/</a> ,
+        find an exchange named <strong>censorship.inbound.exchange</strong> and start publishing messages.
+    </p>
+    <p>
+        You should observe two effects:
+    </p>
+    <ul>
+        <li>Text of your message will be logged to a console,
+        <li>Modified version of your message will land in either <strong>censorship.ok.queue</strong> or <strong>censorship.nok.queue</strong> (based on the text content of your message).
+    </ul>
+    <p>
+        You will notice that messages containing the word <em>'terror'</em> will go to the <strong>nok</strong> queue. This is the initial censorship filter. Feel free to modify the "forbidden words" list.
+    </p>
+</div>
+<div>
+    <h2>Connecting, consuming, processing, publishing</h2>
+    <p>
+        Below you will find main steps for this whole process.
+    </p>
+    <h3>Connecting to RabbitMQ</h3>
+    <p>
+        First thing we do is declaring a connection to RabbitMQ. With Reactive Rabbit library it is as simple as:
+<pre>
+<code>import io.scalac.amqp.Connection
+    val connection = Connection()</code>
+</pre>
+    Reactive Rabbit provides all the connection defaults, but you can customize them in your application.conf.
+    </p>
+    <p>
+        Next thing that has to be done is to set up all the exchanges and queues. Reactive Rabbit provides all the required methods. Unlike the RabbitMQ Java driver, all methods in Reactive Rabbit are asynchronous and return <code>Future</code>.
+    </p>
+    <p>
+        The whole setup is done in <a href="#code/src/main/scala/io/scalac/rabbit/ConsumerApp.scala" class="shortcut">ConsumerApp.setupRabbit()</a>. Snippet below should give an idea of the process:
+<pre>
+<code>
+    /* declare and bind inbound exchange and queue */
+    Future.sequence {
+    connection.exchangeDeclare(inboundExchange) ::
+    connection.queueDeclare(inboundQueue) :: Nil
+    } flatMap { _ =>
+    connection.queueBind(inboundQueue.name, inboundExchange.name, "")
+    }
+</code>
+</pre>
+    </p>
+    <h3>Declaring the consumer and the publisher</h3>
+    <p>
+        We will be consuming from a queue and publishing to an exchange. For this to happen we declare a consumer and publisher (suprisingly) by using appropriate Connection methods. They will give us in return <b>Publisher</b> and <b>Subscriber</b> respectively. This might seem counter-intuitive at first but the RabbitMQ consumer is our stream's Publisher and the RabbitMQ publisher is our stream's Subscriber.
+    </p>
+    <p>
+        It is worth noting that the <b>Publisher</b> and <b>Subscriber</b> returned from <b>Connection</b> are both interfaces defined by <a href="http://www.reactive-streams.org/">Rective Streams</a> specification. That means Reactive Rabbit can be integrated with any implementation of the specification. Here we're using it with Akka Streams by wrapping Publisher and Subscriber into <b>Source</b> and <b>Sink</b>.
+<pre>
+<code>
+    val rabbitConsumer = Source(connection.consume("queue_name"))
+    val rabbitPublisher = Sink(connection.publish("exchange_name"))
+</code>
+</pre>
+
+    <h3>Processing messages</h3>
+    <p>
+        To split the work into logical parts we are using <b><code>Flow[In, Out]</code></b> on which we're applying multiple transformations (like map, mapFuture, groupBy). This allows us to define some message processing independently from the publisher and subscriber and connect them later. All the <code>Flows</code> are defined in the <a href="#code/src/main/scala/io/scalac/rabbit/FlowFactory.scala" class="shortcut">FlowFactory</a> trait.
+    </p>
+    <h3>Putting it all together</h3>
+    <p>
+        After everything is set up we can combine all the parts into one processing pipeline and run the flow. Akka Streams provides us with an awesome, readable and clean DSL for this purpose:
+    </p>
+<pre>
+<code>
+    val flow = rabbitConsumer via consumerMapping via domainProcessing via publisherMapping to rabbitPublisher
+
+    flow.run()
+</code>
+</pre>
+</div>
+<div>
+    <h2>This is it</h2>
+    <p>
+        You just saw a clean functional way of working with RabbitMQ. There are of course many issues that haven't been addressed here, like the RabbitMQ Quality of Service property or rejecting messages at later stages of processing (to name a few). But this should get you going and hopefully this is the way we'll be doing things in the future.
+    </p>
+    <p>
+        Further reading:
+    </p>
+    <ul>
+        <li><a href="https://github.com/ScalaConsultants/reactive-rabbit">Reactive Rabbit - Reactive Streams driver for AMQP protocol</a></li>
+        <li><a href="http://blog.scalac.io/2014/06/23/akka-streams-and-rabbitmq.html">Blog post about Akka Streams and RabbitMQ [Deprecated now, but this is how this started]</a></li>
+    </ul>
+</div>
+</body>
