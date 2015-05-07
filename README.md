@@ -1,8 +1,6 @@
 rabbitmq-akka-streams
 =====================
-This project has been created with Typesafe Activator to play around with Akka Streams and RabbitMQ. It is for study
-purposes only. The project has been made compatible with the API of akka-streams `v1.0-RC2` and uses the latest 
-reactive-rabbit `v1.0.0`, which is the `Reactive Streams driver for AMQP protocol` for RabbitMQ.
+This project is a copy of the original Typesafe Activator Template from the author [Jakub Czuchnowski](https://github.com/jczuchnowski/rabbitmq-akka-stream) and has been created to play around with Akka Streams and RabbitMQ. It is for study purposes only. The project has been made compatible with the API of akka-streams `v1.0-RC2` and uses the latest reactive-rabbit `v1.0.0`, which is the `Reactive Streams driver for AMQP protocol` for RabbitMQ.
 
 # Usage
 Launch the project with the `test.sh` script that will build the project and package it using Docker. Then RabbitMQ
