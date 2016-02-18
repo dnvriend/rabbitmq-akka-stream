@@ -1,10 +1,9 @@
 package io.scalac.rabbit
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
-
 import com.typesafe.scalalogging.slf4j.LazyLogging
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 sealed trait CensoredMessage {
   def message: String
